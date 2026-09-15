@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Сборщик костей — Blender 5.2</title>
+  <meta name="description" content="Аддон для Blender 5.2 LTS: собирает кости арматуры в коллекции и строит анатомический скелет." />
+  <link rel="icon" href="./favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #0c0b0a;
+      --bone: #e8e2d6;
+      --bone-dim: #cfc6b6;
+      --copper: #b56a3a;
+      --line: rgba(232, 226, 214, 0.14);
+      --panel: #141210;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--ink); color: var(--bone); }
+    body {
+      font-family: Newsreader, "Iowan Old Style", serif;
+      font-size: 20px;
+      line-height: 1.45;
+      min-height: 100dvh;
+    }
+    a { color: inherit; }
+    .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.72em; letter-spacing: 0.04em; }
+    header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--line);
+      position: sticky; top: 0; background: rgba(12,11,10,.92);
+      backdrop-filter: blur(12px); z-index: 2;
+    }
+    header nav { display: flex; gap: 1.25rem; }
+    header nav a { text-decoration: none; color: var(--bone-dim); }
+    header nav a:hover { color: var(--bone); }
+    .hero {
+      padding: 4.5rem 1.5rem 3rem;
+      max-width: 1120px; margin: 0 auto;
+      display: grid; gap: 2.5rem;
+      grid-template-columns: 1.1fr 0.9fr;
+      align-items: end;
+    }
+    h1 {
+      font-size: clamp(3rem, 8vw, 6.4rem);
+      font-weight: 400; letter-spacing: -0.04em; line-height: 0.92;
+    }
+    .lede { color: var(--bone-dim); max-width: 34ch; margin-top: 1.25rem; }
+    .cta { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 2rem; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      text-decoration: none; padding: 0.7rem 1.1rem;
+      border: 1px solid var(--bone); color: var(--ink); background: var(--bone);
+    }
+    .btn.ghost { background: transparent; color: var(--bone); }
+    .btn:hover { filter: brightness(1.08); }
+    .frame {
+      border: 1px solid var(--line); background: var(--panel);
+      overflow: hidden; aspect-ratio: 16/10;
+    }
+    .frame img { width: 100%; height: 100%; object-fit: cover; display: block; filter: saturate(0.85) contrast(1.05); }
+    .caption { padding: 0.7rem 0.9rem; color: var(--bone-dim); border-top: 1px solid var(--line); }
+    section { max-width: 1120px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+    h2 { font-size: 2.4rem; font-weight: 400; letter-spacing: -0.03em; margin-bottom: 1.25rem; }
+    .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .card { border: 1px solid var(--line); padding: 1.25rem 1.2rem; background: var(--panel); }
+    .card h3 { font-size: 1.35rem; font-weight: 400; margin-bottom: 0.4rem; }
+    .card p { color: var(--bone-dim); font-size: 1.05rem; }
+    ol.steps { list-style: none; counter-reset: s; display: grid; gap: 0.6rem; }
+    ol.steps li {
+      counter-increment: s; display: grid; grid-template-columns: 2.4rem 1fr;
+      gap: 0.9rem; align-items: start; padding: 0.85rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+    ol.steps li::before {
+      content: counter(s, decimal-leading-zero);
+      font-family: "IBM Plex Mono", monospace; font-size: 0.85rem;
+      color: var(--copper); padding-top: 0.25rem;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 1.05rem; }
+    th, td { text-align: left; padding: 0.65rem 0.4rem; border-bottom: 1px solid var(--line); }
+    th { color: var(--bone-dim); font-weight: 400; font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; font-family: "IBM Plex Mono", monospace; }
+    .shots { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 1rem; }
+    .shots .frame:last-child { aspect-ratio: auto; }
+    footer {
+      border-top: 1px solid var(--line);
+      padding: 1.5rem; display: flex; justify-content: space-between; gap: 1rem;
+      color: var(--bone-dim); max-width: 1120px; margin: 0 auto;
+    }
+    .copper { color: var(--copper); }
+    @media (max-width: 840px) {
+      .hero, .grid3, .shots { grid-template-columns: 1fr; }
+      header nav { display: none; }
+      h1 { font-size: 3.2rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="mono">SBORCHIK / 1.0.0</span>
+    <nav class="mono">
+      <a href="#install">установка</a>
+      <a href="#ops">панель</a>
+      <a href="https://github.com/Peligrosso087/sborchik">github</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div>
+      <p class="mono copper">BLENDER 5.2 LTS · RIGGING</p>
+      <h1>Сборщик<br/>костей</h1>
+      <p class="lede">Раскладывает арматуру по коллекциям и строит гуманоидный скелет. Mixamo, Rigify, имена Blender — одним оператором.</p>
+      <div class="cta">
+        <a class="btn mono" href="https://github.com/Peligrosso087/sborchik/releases/download/v1.0.0/collector.py">скачать collector.py</a>
+        <a class="btn ghost mono" href="https://github.com/Peligrosso087/sborchik">репозиторий</a>
+      </div>
+    </div>
+    <figure class="frame">
+      <img src="./img/bones.png" alt="Octahedral armature in the collector viewport" />
+      <figcaption class="caption mono">53 кости · анатомия · octahedral</figcaption>
+    </figure>
+  </div>
+
+  <section>
+    <h2>Что делает</h2>
+    <div class="grid3">
+      <article class="card">
+        <h3>Собрать кости</h3>
+        <p>Классифицирует активную арматуру: руки L/R, кисти, ноги, позвоночник, механика. Красит. Прячет IK.</p>
+      </article>
+      <article class="card">
+        <h3>Создать скелет</h3>
+        <p>Гуманоид 1.8&nbsp;м, пальцы, 53 кости, у 3D-курсора. Сразу в коллекциях сборщика.</p>
+      </article>
+      <article class="card">
+        <h3>Один файл</h3>
+        <p>Без зависимостей. Install from Disk. MIT. Панель во вкладке N → Сборщик.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Установка</h2>
+    <ol class="steps">
+      <li>Скачай <a href="https://github.com/Peligrosso087/sborchik/releases/tag/v1.0.0">collector.py</a> с релиза v1.0.0.</li>
+      <li>Blender 5.2 → Edit → Preferences → Add-ons.</li>
+      <li>Install from Disk → выбери файл.</li>
+      <li>Включи «Сборщик костей».</li>
+      <li>В 3D Viewport нажми N — вкладка «Сборщик».</li>
+    </ol>
+  </section>
+
+  <section id="ops">
+    <h2>Коллекции</h2>
+    <table>
+      <thead><tr><th>Коллекция</th><th>Попадает сюда</th></tr></thead>
+      <tbody>
+        <tr><td>Корень</td><td>root, armature</td></tr>
+        <tr><td>Позвоночник</td><td>pelvis, spine, hips</td></tr>
+        <tr><td>Голова</td><td>head, neck, jaw, eye</td></tr>
+        <tr><td>Рука L / R</td><td>shoulder, arm, forearm</td></tr>
+        <tr><td>Кисть L / R</td><td>hand, thumb, fingers</td></tr>
+        <tr><td>Нога L / R</td><td>thigh, shin, foot, toe</td></tr>
+        <tr><td>IK / Механика</td><td>ik, pole, mch — по желанию скрыты</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <div class="shots">
+      <figure class="frame">
+        <img src="./img/studio.png" alt="Collector studio packing collections" />
+        <figcaption class="caption mono">цех: раскладка коллекций</figcaption>
+      </figure>
+      <figure class="frame">
+        <img src="./img/hub.png" alt="Academy hub with completed lessons" />
+        <figcaption class="caption mono">академия 5.2</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <footer class="mono">
+    <span>© 2026 Peligrosso087 · MIT</span>
+    <a href="https://github.com/Peligrosso087/sborchik">github.com/Peligrosso087/sborchik</a>
+  </footer>
+</body>
+</html>
